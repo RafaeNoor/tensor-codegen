@@ -53,9 +53,9 @@ static cl::opt<std::string> ReadKnobsFrom(
                                 "and lower instructions with these values"));
 
 //struct CodeGenKnobs {
-  unsigned TileSize_M = 4;
-  unsigned TileSize_N = 4;
-  unsigned TileSize_K = 10;
+  unsigned TileSize_M = 2;
+  unsigned TileSize_N = 2;
+  unsigned TileSize_K = 2;
 
   unsigned TileSize = 2;
 
@@ -65,9 +65,9 @@ static cl::opt<std::string> ReadKnobsFrom(
 
   unsigned InnerLoopUnrollFactor = 0;
 
-  bool LowerToVectorIntrinsics = false;
+  bool LowerToVectorIntrinsics = true;
 
-  bool LowerToTileIntrinsics = true;
+  bool LowerToTileIntrinsics = false;
 //};
 
 struct TiledLoopNestInfo {
@@ -2322,10 +2322,13 @@ public:
           InnerBodyTerminator);
 
       // Generate the matmul kernel
-      if(LowerToVectorIntrinsics)
+      if(LowerToVectorIntrinsics){
+        LLVM_DEBUG(dbgs() << "Using generateMatrixMultiply1DKernel"<<"\n");
         generateMatrixMultiply1DKernel(MMInfo, EltType, InnerBodyTerminator);
-      else
+      } else {
+        LLVM_DEBUG(dbgs() << "Using generateMatrixMultiplyKernel"<<"\n");
         generateMatrixMultiplyKernel(MMInfo, EltType, InnerBodyTerminator);
+      }
 
       LLVM_DEBUG(dbgs() << "GENERATING MATMUL: \n");
       LLVM_DEBUG(dbgs() << *(MatMul->getParent()->getParent()) << "\n");
@@ -2694,8 +2697,9 @@ Value *generateElementWiseScalarKernel(Intrinsic::ID ID,
       Value *BroadcastVal, unsigned NumElems, Instruction *InsertBefore) {
     // Generate the vector splat intrinsic
     auto *RetTy = FixedVectorType::get(BroadcastVal->getType(), NumElems);
+    // Modified  [Rafae]
     auto *SplatIntrinsic = Intrinsic::getDeclaration(InsertBefore->getModule(), 
-                                  Intrinsic::vector_splat, ArrayRef<Type*>({RetTy}));
+                                  Intrinsic::vector_splat, ArrayRef<Type*>({RetTy, RetTy}));
     std::vector<Value *> Args {Input, BroadcastVal};
     return CallInst::Create(SplatIntrinsic, Args, "", InsertBefore);
   }
